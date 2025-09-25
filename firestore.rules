@@ -1,38 +1,79 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Hotels collection
-    // Agency can read/write individual hotel documents and list the collection.
-    // Hoteliers can only read their own specific hotel document.
+    // Helper function to check if a user has the 'agency' role.
+    function isAgency() {
+      return request.auth != null && request.auth.token.role == 'agency';
+    }
+
+    // Helper function to check if a user has the 'hotelier' role.
+    function isHotelier() {
+      return request.auth != null && request.auth.token.role == 'hotelier';
+    }
+
+    // Helper function to check if the logged-in hotelier is the owner of the resource.
+    function isOwner(hotelId) {
+      return isHotelier() && request.auth.token.hotelId == hotelId;
+    }
+    
+    // ===== RULES FOR HOTELS =====
+    // This collection stores the main data for each hotel partner.
     match /hotels/{hotelId} {
-      // Allow agency to list all hotels. THIS IS THE FIX.
-      allow list: if request.auth.token.role == 'agency';
-
-      // Allow agency to read any single hotel, and hoteliers to read their own.
-      allow get: if request.auth.token.role == 'agency' || (request.auth.token.role == 'hotelier' && request.auth.token.hotelId == hotelId);
+      // ONLY the agency can create, read, update, or delete hotel documents.
+      // Hoteliers can view their data through the dashboard, but cannot modify the root hotel document.
+      allow read, write: if isAgency();
       
-      // Allow only agency to create, update, or delete hotels.
-      allow write: if request.auth.token.role == 'agency';
-
-      // Bookings sub-collection for a hotel
+      // ===== SUB-COLLECTION RULES FOR BOOKINGS =====
+      // Bookings are stored in a sub-collection under each hotel.
       match /bookings/{bookingId} {
-        // Agency can read/write bookings for any hotel.
-        // Hoteliers can read/write bookings for their own hotel.
-        allow read, write: if request.auth.token.role == 'agency' 
-                           || (request.auth.token.role == 'hotelier' && request.auth.token.hotelId == hotelId);
+          // READ: Who can read booking documents?
+          allow read: if 
+            // 1. The agency can read everything for support and overview.
+            isAgency() || 
+            // 2. A hotelier can only read bookings belonging to their specific hotel.
+            isOwner(hotelId);
+
+          // WRITE (CREATE, UPDATE, DELETE): Who can modify booking documents?
+          allow write: if 
+            // 1. The agency can manage all bookings.
+            isAgency() || 
+            // 2. A hotelier can only manage bookings for their own hotel.
+            isOwner(hotelId);
       }
     }
 
-    // Booking Links collection
-    // Any user (including unauthenticated guests) can read a link, as it's needed for the guest page.
-    // Agency and hoteliers can create links.
-    // Guests can update their own link (to mark it as 'used').
+    // ===== RULES FOR BOOKING LINKS =====
+    // This collection stores the unique, secret links for guests.
     match /bookingLinks/{linkId} {
-      allow get: if true;
-      allow create: if request.auth.token.role == 'agency' || request.auth.token.role == 'hotelier';
-      allow update: if request.auth == null || request.auth.token.role == 'agency' || (request.auth.token.role == 'hotelier' && request.auth.token.hotelId == resource.data.hotelId);
-      allow list, delete: if request.auth.token.role == 'agency';
+        // READ: Who can read a booking link document?
+        allow read: if 
+            // 1. The agency can read all links.
+            isAgency() ||
+            // 2. A hotelier can read a link if it belongs to their hotel.
+            isOwner(resource.data.hotelId) ||
+            // 3. Anyone (including unauthenticated guests) can read a link. This is necessary
+            // for the guest page to load the initial booking data. The linkId is secret.
+            request.auth == null;
+
+        // CREATE: Who can create a booking link?
+        allow create: if
+            // Only the agency or the responsible hotelier can create new links.
+            isAgency() || isOwner(request.resource.data.hotelId);
+
+        // UPDATE: Who can update a booking link?
+        allow update: if
+            // An unauthenticated guest can update a link (e.g., set status to 'used')
+            // This is the action of submitting their data.
+            request.auth == null ||
+            // The agency or the owner hotelier can also update it.
+            isAgency() || isOwner(resource.data.hotelId);
+            
+        // DELETE: Who can delete a booking link?
+        allow delete: if 
+            // Only the agency or the owner hotelier can delete links.
+            isAgency() || isOwner(resource.data.hotelId);
     }
   }
 }
