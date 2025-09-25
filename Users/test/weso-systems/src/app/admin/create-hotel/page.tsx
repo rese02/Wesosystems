@@ -24,10 +24,16 @@ const initialState = {
   errorType: null,
 };
 
+type RoomCategory = {
+  id: number;
+  name: string;
+};
+
+
 export default function CreateHotelPage() {
-  const [roomCategories, setRoomCategories] = useState<string[]>([
-    'Einzelzimmer',
-    'Doppelzimmer',
+  const [roomCategories, setRoomCategories] = useState<RoomCategory[]>([
+    { id: 1, name: 'Einzelzimmer' },
+    { id: 2, name: 'Doppelzimmer' },
   ]);
   const [hotelierPassword, setHotelierPassword] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
@@ -54,6 +60,22 @@ export default function CreateHotelPage() {
     }
     setHotelierPassword(password);
     toast({ title: 'Neues Passwort generiert!' });
+  };
+  
+  const addRoomCategory = () => {
+    setRoomCategories([...roomCategories, { id: Date.now(), name: 'Neue Kategorie' }]);
+  };
+  
+  const removeRoomCategory = (id: number) => {
+    setRoomCategories(roomCategories.filter((category) => category.id !== id));
+  };
+  
+  const updateRoomCategory = (id: number, name: string) => {
+    setRoomCategories(
+      roomCategories.map((category) =>
+        category.id === id ? { ...category, name } : category
+      )
+    );
   };
 
 
@@ -270,25 +292,21 @@ export default function CreateHotelPage() {
 
                     <div className="space-y-2">
                     <Label>Zimmerkategorien</Label>
-                    {roomCategories.map((category, index) => (
-                        <div key={index} className="flex items-center gap-2">
+                    {roomCategories.map((category) => (
+                        <div key={category.id} className="flex items-center gap-2">
                         <Input
                             name="roomCategories"
-                            defaultValue={category}
-                            onChange={(e) => {
-                                const newCategories = [...roomCategories];
-                                newCategories[index] = e.target.value;
-                                setRoomCategories(newCategories);
-                            }}
+                            defaultValue={category.name}
+                            onChange={(e) => updateRoomCategory(category.id, e.target.value)}
                         />
                         {roomCategories.length > 1 && (
-                            <Button type="button" variant="outline" size="icon" onClick={() => setRoomCategories(roomCategories.filter((_, i) => i !== index))}>
+                            <Button type="button" variant="outline" size="icon" onClick={() => removeRoomCategory(category.id)}>
                                 <Trash2 className="h-4 w-4" />
                             </Button>
                         )}
                         </div>
                     ))}
-                    <Button type="button" variant="outline" onClick={() => setRoomCategories([...roomCategories, 'Neue Kategorie'])}>
+                    <Button type="button" variant="outline" onClick={addRoomCategory}>
                         <PlusCircle className="mr-2 h-4 w-4" /> Zimmerkategorie hinzufügen
                     </Button>
                     </div>
