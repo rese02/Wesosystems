@@ -12,34 +12,24 @@ import {useEffect, useState, Suspense} from 'react';
 import { useSearchParams } from 'next/navigation';
 
 function AgencyDashboard() {
-  const searchParams = useSearchParams();
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(true);
   
   // This effect handles the temporary storage and retrieval of the new hotelier password.
   useEffect(() => {
-    const newPassword = searchParams.get('newPassword');
-    if (newPassword) {
-      // Store the password in sessionStorage to make it available to other components
-      // without keeping it in the URL.
-      sessionStorage.setItem('tempNewPassword', newPassword);
-      
-      // Clean up the URL by removing the search parameter.
-      window.history.replaceState(null, '', '/admin');
-    }
-  }, [searchParams]);
+    // This is a client-side only operation.
+    if (typeof window === 'undefined') return;
 
-
-  useEffect(() => {
+    const tempPassword = sessionStorage.getItem('tempNewPassword');
+    
     const hotelsCollection = collection(db, 'hotels');
     const q = query(hotelsCollection, orderBy('createdAt', 'desc'));
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const tempPassword = sessionStorage.getItem('tempNewPassword');
 
-        const hotelsList = snapshot.docs.map((doc, index) => {
+        const hotelsList = snapshot.docs.map((doc) => {
           const data = doc.data();
 
           // Handle Timestamp conversion safely
@@ -50,7 +40,7 @@ function AgencyDashboard() {
           let hotelier = data.hotelier;
           // Attach the temporarily stored password to the most recently created hotel
           // This allows the "copy credentials" button to work once.
-          if (tempPassword && index === 0) {
+          if (tempPassword && snapshot.docs[0].id === doc.id) {
              hotelier = { ...hotelier, password: tempPassword };
           }
           

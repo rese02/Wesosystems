@@ -116,7 +116,7 @@ export async function createHotelAction(
   }
 
   revalidatePath('/admin');
-  redirect(`/admin?newPassword=${encodeURIComponent(hotelierPassword)}`);
+  return { success: true, message: 'Hotel erfolgreich erstellt!' };
 }
 
 export async function deleteHotelAction(hotelId: string) {

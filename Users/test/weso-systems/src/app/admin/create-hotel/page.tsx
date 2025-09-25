@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { FileUpload } from '@/components/guest/file-upload';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 
 const initialState = {
   message: '',
@@ -31,16 +32,28 @@ type RoomCategory = {
 
 
 export default function CreateHotelPage() {
+  const router = useRouter();
   const [roomCategories, setRoomCategories] = useState<RoomCategory[]>([
     { id: 1, name: 'Einzelzimmer' },
     { id: 2, name: 'Doppelzimmer' },
   ]);
   const [hotelierPassword, setHotelierPassword] = useState('');
+  const passwordRef = useRef('');
   const [logoUrl, setLogoUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
   
-  const [state, action, isPending] = useActionState(createHotelAction, initialState);
+  const wrappedCreateHotelAction = async (prevState: any, formData: FormData) => {
+    const result = await createHotelAction(prevState, formData);
+    if (result.success) {
+      // Temporarily store the password to show it on the next page
+      sessionStorage.setItem('tempNewPassword', passwordRef.current);
+      router.push(`/admin`);
+    }
+    return result;
+  };
+
+  const [state, action, isPending] = useActionState(wrappedCreateHotelAction, initialState);
   
   useEffect(() => {
     if (state.message && !state.success) {
@@ -59,6 +72,7 @@ export default function CreateHotelPage() {
       password += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     setHotelierPassword(password);
+    passwordRef.current = password;
     toast({ title: 'Neues Passwort generiert!' });
   };
   
